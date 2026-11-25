@@ -131,11 +131,24 @@ function ConnectedCore() {
         {heroNodes.map((node, i) => (
           <div
             key={node.label}
-            className="anim-fade absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-paper/14 bg-ink-2 px-3.5 py-2 font-mono text-xs text-fog-2 transition-colors duration-300 hover:border-accent hover:text-white max-[760px]:p-1.5"
-            style={{ left: node.left, top: node.top, animationDelay: `${1.1 + i * 0.1}s` }}
+            className={[
+              "anim-fade absolute top-(--y) left-(--x) flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-paper/14 bg-ink-2 px-3.5 py-2 font-mono text-xs text-fog-2 transition-colors duration-300 hover:border-accent hover:text-white",
+              // Phones: smaller pills, side labels pinned to the ring's edge so they stay on screen.
+              "max-[760px]:top-(--y-sm) max-[760px]:gap-1.5 max-[760px]:px-2 max-[760px]:py-1.5 max-[760px]:text-[11px]",
+              node.side === "left" ? "max-[760px]:left-0 max-[760px]:translate-x-0" : "",
+              node.side === "right" ? "max-[760px]:right-0 max-[760px]:left-auto max-[760px]:translate-x-0" : "",
+            ].join(" ")}
+            style={
+              {
+                "--x": node.left,
+                "--y": node.top,
+                "--y-sm": node.topSm,
+                animationDelay: `${1.1 + i * 0.1}s`,
+              } as CSSProperties
+            }
           >
             <i className="block size-1.5 rounded-full bg-accent" />
-            <span className="max-[760px]:hidden">{node.label}</span>
+            <span>{node.label}</span>
           </div>
         ))}
       </div>
