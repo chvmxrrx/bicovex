@@ -205,12 +205,9 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Contact stepper: slide between steps, animate the card's height
+   Contact stepper: slide between steps
    --------------------------------------------------------------------------- */
 @layer components {
-  .step-stage {
-    transition: height 0.42s var(--ease-out-soft);
-  }
   .step-panel {
     transition:
       transform 0.42s var(--ease-out-soft),
@@ -229,12 +226,12 @@
   .step-panel.leave-l {
     transform: translateX(-36px);
     opacity: 0;
-    transition-duration: 0.2s;
+    transition-duration: 0.18s;
   }
   .step-panel.leave-r {
     transform: translateX(36px);
     opacity: 0;
-    transition-duration: 0.2s;
+    transition-duration: 0.18s;
   }
   .done-quadrant {
     animation: mod-in 1.1s var(--ease-out-soft) both;

@@ -33,7 +33,14 @@ const QUADRANT_MOTION = [
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Four-step contact form: services, name, contact detail, review and send. */
+/** Phones show the card as a full-screen sheet, so every step change re-aligns it to the top. */
+const isPhone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+
+/**
+ * Four-step contact form: services, name, contact detail, review and send.
+ * Phones: the card fills the visible screen and the buttons sit at the bottom.
+ * Tablet and up: the card sizes to its content with a steady minimum height.
+ */
 export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: string }) {
   const [draft, setDraft] = useState<ContactDraft>(emptyDraft);
   /** The step the progress bar and buttons reflect. */
@@ -54,7 +61,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
   const turnstileBoxRef = useRef<HTMLDivElement>(null);
   const turnstileIdRef = useRef<string | null>(null);
 
-  const stageRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -105,7 +112,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
     setError(null);
   };
 
-  /* ---------- navigation with slide + height transitions ---------- */
+  /* ---------- navigation with a slide between steps ---------- */
   const goTo = useCallback((n: number) => {
     const from = stepRef.current;
     if (busy.current || n === from) return;
@@ -120,15 +127,13 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
       return;
     }
     busy.current = true;
-    const stage = stageRef.current;
-    if (stage) stage.style.height = `${stage.offsetHeight}px`;
     const forward = n > from;
     setAnim(forward ? "leave-l" : "leave-r");
     window.setTimeout(() => {
       entering.current = true;
       setShown(n);
       setAnim(forward ? "enter-r" : "enter-l");
-    }, 200);
+    }, 180);
   }, []);
 
   const onArrive = useCallback((n: number) => {
@@ -139,26 +144,26 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
     if (n === 2 && d.channel === "telefono" && !d.phone) target = phoneRef.current;
     target?.focus({ preventScroll: true });
     setLive(n === DONE ? "Solicitud enviada." : `Paso ${n + 1} de 4: ${STEPS[n]}`);
-    const stage = stageRef.current;
-    if (stage && stage.getBoundingClientRect().top < 0) {
-      stage.closest("form")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+
+    const form = formRef.current;
+    if (!form) return;
+    const top = form.getBoundingClientRect().top;
+    if (top < 0 || (isPhone() && Math.abs(top - 12) > 4)) {
+      form.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
     }
   }, []);
 
   useLayoutEffect(() => {
-    const stage = stageRef.current;
     const panel = panelRef.current;
-    if (!stage || !panel) return;
+    if (!panel) return;
     if (entering.current) {
       entering.current = false;
-      stage.style.height = `${panel.offsetHeight}px`;
       void panel.offsetWidth;
-      requestAnimationFrame(() => setAnim(""));
-      window.setTimeout(() => {
-        stage.style.height = "";
+      requestAnimationFrame(() => {
+        setAnim("");
         busy.current = false;
         onArrive(shown);
-      }, 430);
+      });
     } else if (arrived.current) {
       arrived.current = false;
       onArrive(shown);
@@ -231,7 +236,14 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
 
   /* ---------- submit: validate the step, advance, or send ---------- */
   const focusError = (err: FieldError) => {
-    const el = err.field === "name" ? nameRef.current : err.field === "email" ? emailRef.current : err.field === "phone" ? phoneRef.current : null;
+    const el =
+      err.field === "name"
+        ? nameRef.current
+        : err.field === "email"
+          ? emailRef.current
+          : err.field === "phone"
+            ? phoneRef.current
+            : null;
     el?.focus();
   };
 
@@ -331,9 +343,15 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
 
   return (
     <form
+      ref={formRef}
       onSubmit={onSubmit}
       noValidate
-      className="relative flex w-full max-w-[880px] scroll-mt-6 flex-col gap-9 rounded-[28px] border border-paper/12 bg-ink-2 p-[clamp(22px,4vw,44px)]"
+      className={[
+        "relative flex w-full scroll-mt-3 flex-col overflow-hidden border border-paper/12 bg-ink-2",
+        // Phone: a sheet as tall as the visible screen. Tablet and up: sized by content.
+        "min-h-[calc(100svh-24px)] gap-5 rounded-3xl p-5",
+        "sm:min-h-0 sm:gap-[26px] sm:rounded-[28px] sm:p-8 lg:p-9",
+      ].join(" ")}
     >
       {/* Honeypot: hidden from people and screen readers, bots tend to fill it in. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
@@ -343,10 +361,10 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
 
       {/* Progress */}
       <div className={step === DONE ? "invisible h-0 overflow-hidden" : ""}>
-        <p aria-hidden="true" className="mb-3 hidden font-mono text-xs uppercase tracking-[.12em] text-mist max-[640px]:block">
+        <p aria-hidden="true" className="mb-2.5 font-mono text-xs uppercase tracking-[.12em] text-mist sm:hidden">
           Paso <b className="font-medium text-paper">{Math.min(step, 3) + 1}</b> de 4 · {STEPS[Math.min(step, 3)]}
         </p>
-        <ol aria-label="Progreso del formulario" className="m-0 grid list-none grid-cols-4 gap-2.5 p-0">
+        <ol aria-label="Progreso del formulario" className="m-0 grid list-none grid-cols-4 gap-2 p-0 sm:gap-2.5">
           {STEPS.map((label, i) => {
             const current = i === step;
             const done = !current && isStepDone(i);
@@ -362,7 +380,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                   className="group/p flex w-full cursor-pointer flex-col gap-2.5 text-left focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-[6px] focus-visible:outline-accent disabled:cursor-default"
                 >
                   <span
-                    className={`flex items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-xs uppercase tracking-[.12em] transition-colors duration-300 ${
+                    className={`flex items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-xs uppercase tracking-[.12em] transition-colors duration-300 max-sm:hidden ${
                       current ? "text-paper" : done ? "text-mist group-hover/p:text-paper" : "text-dim"
                     }`}
                   >
@@ -379,9 +397,9 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                         i + 1
                       )}
                     </span>
-                    <span className="truncate max-[640px]:hidden">{label}</span>
+                    <span className="truncate">{label}</span>
                   </span>
-                  <span className="block h-0.5 overflow-hidden bg-paper/10">
+                  <span className="block h-[3px] overflow-hidden rounded-sm bg-paper/10 sm:h-0.5">
                     <span
                       className={`block h-full origin-left bg-accent transition-transform duration-700 ease-out-soft ${
                         current || done ? "scale-x-100" : "scale-x-0"
@@ -395,15 +413,15 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
         </ol>
       </div>
 
-      {/* Steps */}
-      <div ref={stageRef} className="step-stage relative overflow-hidden">
-        <div ref={panelRef} className={`step-panel flex flex-col gap-7 ${anim}`}>
+      {/* Steps. The stage keeps a steady height on larger screens so the buttons don't jump. */}
+      <div className="relative flex flex-1 flex-col sm:min-h-[340px]">
+        <div ref={panelRef} className={`step-panel flex flex-1 flex-col gap-[18px] sm:gap-6 ${anim}`}>
           {shown === 0 && (
             <>
               <StepTitle ref={headingRef} title="¿Qué necesitas?">
-                Marca uno o varios. Si aún no lo tienes claro, elige lo más cercano y lo conversamos.
+                Marca uno o varios. Si no lo tienes claro, elige lo más cercano.
               </StepTitle>
-              <div role="group" aria-label="Servicios de interés" className="flex flex-wrap gap-2.5">
+              <div role="group" aria-label="Servicios de interés" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
                 {services.map((s, i) => {
                   const on = draft.services.includes(i);
                   return (
@@ -413,40 +431,39 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                       onClick={() => toggleService(i)}
                       aria-pressed={on}
                       className={[
-                        "inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-full border px-[18px] text-[15px]",
+                        "flex min-h-[46px] cursor-pointer items-center gap-2.5 rounded-[14px] border px-3.5 text-left text-[15px] sm:rounded-full sm:px-[18px]",
                         "transition-[background-color,color,border-color,transform] duration-300 active:scale-[.97]",
                         "focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent",
                         on ? "border-paper bg-paper text-ink" : "border-paper/22 text-fog-3 hover:border-paper/55",
                       ].join(" ")}
                     >
                       <span
-                        className={`size-2.5 rounded-[2px] border transition-colors duration-300 ${
+                        className={`size-2.5 flex-none rounded-[2px] border transition-colors duration-300 ${
                           on ? "border-accent bg-accent" : "border-paper/50"
                         }`}
                       />
-                      {s.name}
+                      <span className="sm:hidden">{s.short}</span>
+                      <span className="hidden sm:inline">{s.name}</span>
                     </button>
                   );
                 })}
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <button
                   type="button"
                   aria-expanded={detailsOpen}
                   aria-controls="details-box"
                   onClick={() => {
                     setDetailsOpen((o) => !o);
-                    if (!detailsOpen) requestAnimationFrame(() => detailsRef.current?.focus());
+                    if (!detailsOpen) requestAnimationFrame(() => detailsRef.current?.focus({ preventScroll: true }));
                   }}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 self-start text-sm text-mist transition-colors hover:text-paper focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                  className="inline-flex min-h-10 cursor-pointer items-center gap-2 self-start text-sm text-mist transition-colors hover:text-paper focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
                 >
                   <span aria-hidden="true" className={`inline-block transition-transform duration-300 ${detailsOpen ? "rotate-45" : ""}`}>
                     +
                   </span>
-                  Agregar detalles del proyecto
-                  <span className="rounded-full border border-paper/12 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[.1em] text-dim">
-                    Opcional
-                  </span>
+                  Agregar detalles
+                  <OptionalTag />
                 </button>
                 <div id="details-box" hidden={!detailsOpen}>
                   <label htmlFor="details" className="sr-only">
@@ -458,8 +475,8 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                     value={draft.details}
                     maxLength={LIMITS.details}
                     onChange={(e) => update({ details: e.target.value })}
-                    placeholder="Por ejemplo: tengo una clínica con 3 sedes y quiero que los pacientes reserven y paguen online."
-                    className="min-h-[110px] w-full resize-y rounded-2xl border border-paper/12 bg-ink px-4 py-3.5 text-base leading-[1.55] text-paper outline-none placeholder:text-[#5E6878] focus:border-accent"
+                    placeholder="Por ejemplo: tengo una clínica con 3 sedes y quiero reservas y pagos online."
+                    className="h-[88px] w-full resize-none rounded-[14px] border border-paper/12 bg-ink px-3.5 py-3 text-[15px] leading-normal text-paper outline-none placeholder:text-[#5E6878] focus:border-accent sm:h-[104px]"
                   />
                 </div>
               </div>
@@ -470,9 +487,9 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
           {shown === 1 && (
             <>
               <StepTitle ref={headingRef} title="¿Con quién hablamos?">
-                Así sabremos a quién dirigirnos en la propuesta.
+                Así sabremos a quién dirigir la propuesta.
               </StepTitle>
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3.5">
                 <LineField id="name" label="Tu nombre" error={error?.field === "name" ? error.message : ""}>
                   <input
                     ref={nameRef}
@@ -493,7 +510,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                     id="company"
                     type="text"
                     autoComplete="organization"
-                    placeholder="Nombre de tu empresa o proyecto"
+                    placeholder="Tu empresa o proyecto"
                     maxLength={LIMITS.company}
                     value={draft.company}
                     onChange={(e) => update({ company: e.target.value })}
@@ -507,15 +524,15 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
           {shown === 2 && (
             <>
               <StepTitle ref={headingRef} title="¿Cómo te contactamos?">
-                Elige el canal que prefieras. Lo usamos solo para responder esta solicitud.
+                Lo usamos solo para responder esta solicitud.
               </StepTitle>
               <div
                 role="radiogroup"
                 aria-label="Canal de contacto"
-                className="inline-flex max-w-full flex-wrap gap-1 self-start rounded-full border border-paper/22 p-1"
+                className="grid grid-cols-2 gap-1 rounded-full border border-paper/22 p-1 sm:inline-grid sm:self-start"
               >
                 {CHANNELS.map((c) => (
-                  <span key={c.id}>
+                  <span key={c.id} className="flex">
                     <input
                       type="radio"
                       name="channel"
@@ -524,13 +541,15 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                       checked={draft.channel === c.id}
                       onChange={() => {
                         update({ channel: c.id });
-                        requestAnimationFrame(() => (c.id === "email" ? emailRef : phoneRef).current?.focus());
+                        requestAnimationFrame(() =>
+                          (c.id === "email" ? emailRef : phoneRef).current?.focus({ preventScroll: true }),
+                        );
                       }}
                       className="peer sr-only"
                     />
                     <label
                       htmlFor={`ch-${c.id}`}
-                      className="inline-flex min-h-[42px] cursor-pointer items-center gap-2 rounded-full px-4 text-[15px] text-fog-3 transition-colors duration-300 hover:text-paper peer-checked:bg-paper peer-checked:text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                      className="inline-flex min-h-[42px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-[15px] text-fog-3 transition-colors duration-300 hover:text-paper peer-checked:bg-paper peer-checked:text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
                     >
                       {c.id === "email" ? <MailIcon /> : <PhoneIcon />}
                       {c.label}
@@ -572,54 +591,57 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
                   />
                 </LineField>
               )}
-              <p className="m-0 flex items-start gap-2.5 text-sm leading-[1.55] text-dim">
-                <LockIcon />
-                Tus datos llegan directo al equipo de BICOVEX y no se comparten con nadie más.
-              </p>
+              {/* On desktop this note sits in the text column instead. */}
+              <PrivacyNote className="text-[13px] lg:hidden" />
             </>
           )}
 
           {shown === 3 && (
             <>
-              <StepTitle ref={headingRef} title="Revisa y envía">
-                Confirma que todo esté bien. Puedes editar cualquier dato antes de enviar.
-              </StepTitle>
-              <dl className="m-0 border-t border-paper/12">
-                <SummaryRow label="Servicios" onEdit={() => goTo(0)}>
+              {/* No subtitle here: the "Editar" links explain themselves and the step needs the room. */}
+              <StepTitle ref={headingRef} title="Revisa y envía" />
+              <dl className="m-0 grid grid-cols-1 border-t border-paper/12 sm:grid-cols-2 sm:gap-x-6">
+                <SummaryCell label="Servicios" onEdit={() => goTo(0)} wide>
                   <span className="flex flex-wrap gap-1.5">
                     {draft.services.map((i) => (
-                      <span key={i} className="rounded-full border border-paper/22 px-2.5 py-1.5 font-mono text-xs text-fog-3">
-                        {services[i].name}
+                      <span
+                        key={i}
+                        title={services[i].name}
+                        className="rounded-full border border-paper/22 px-2.5 py-1 font-mono text-xs text-fog-3"
+                      >
+                        {services[i].short}
                       </span>
                     ))}
                   </span>
-                </SummaryRow>
-                {draft.details.trim() && (
-                  <SummaryRow label="Detalles" onEdit={() => goTo(0)}>
-                    <span className="whitespace-pre-wrap">{draft.details.trim()}</span>
-                  </SummaryRow>
-                )}
-                <SummaryRow label="Nombre" onEdit={() => goTo(1)}>
+                </SummaryCell>
+                <SummaryCell label="Nombre" onEdit={() => goTo(1)}>
                   {draft.name.trim()}
-                  {draft.company.trim() && <span className="block text-sm text-mist">{draft.company.trim()}</span>}
-                </SummaryRow>
-                <SummaryRow label="Contacto" onEdit={() => goTo(2)}>
+                  {draft.company.trim() && <span className="block text-[13px] text-mist">{draft.company.trim()}</span>}
+                </SummaryCell>
+                <SummaryCell label="Contacto" onEdit={() => goTo(2)}>
                   {contactValue(draft)}
-                  <span className="block text-sm text-mist">
+                  <span className="block text-[13px] text-mist">
                     Prefiere {draft.channel === "email" ? "correo" : "teléfono"}
                   </span>
-                </SummaryRow>
+                </SummaryCell>
+                {draft.details.trim() && (
+                  <SummaryCell label="Detalles" onEdit={() => goTo(0)} wide>
+                    <span className="line-clamp-1 text-sm text-fog-4 sm:line-clamp-2">{draft.details.trim()}</span>
+                  </SummaryCell>
+                )}
               </dl>
-              {turnstileSiteKey && <div ref={turnstileBoxRef} className="empty:hidden" />}
-              <p role="alert" className="m-0 min-h-5 text-sm text-[#F98B8B]">
-                {sendError}
-              </p>
+              {turnstileSiteKey && <div ref={turnstileBoxRef} />}
+              {sendError && (
+                <p role="alert" className="m-0 text-sm leading-snug text-[#F98B8B]">
+                  {sendError}
+                </p>
+              )}
             </>
           )}
 
           {shown === DONE && (
-            <div className="flex flex-col items-start gap-6 py-2">
-              <svg viewBox="0 0 364 364" width="88" height="88" aria-hidden="true">
+            <div className="flex flex-1 flex-col items-start justify-center gap-5 py-2">
+              <svg viewBox="0 0 364 364" width="72" height="72" aria-hidden="true">
                 <g fill="#F5F7FA">
                   {MARK_QUADRANTS.map((d, i) => (
                     <path
@@ -642,11 +664,11 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
               <h3
                 ref={headingRef}
                 tabIndex={-1}
-                className="m-0 text-[clamp(30px,3.6vw,48px)] font-semibold leading-[1.05] tracking-[-.035em] outline-none"
+                className="m-0 text-[28px] font-semibold leading-[1.08] tracking-[-.03em] outline-none sm:text-[36px]"
               >
                 Gracias, {sent?.name.trim().split(/\s+/)[0]}. Recibimos tu solicitud.
               </h3>
-              <p className="m-0 max-w-[54ch] text-[17px] leading-[1.6] text-mist">
+              <p className="m-0 max-w-[54ch] text-base leading-[1.6] text-mist sm:text-[17px]">
                 Te contactaremos {sent?.channel === "email" ? "por correo a " : "por teléfono al "}
                 <b className="font-medium text-paper">{sent ? contactValue(sent) : ""}</b> con una propuesta inicial y los
                 siguientes pasos.
@@ -654,7 +676,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
               <button
                 type="button"
                 onClick={restart}
-                className="inline-flex min-h-12 cursor-pointer items-center rounded-full border border-paper/22 px-[22px] text-[15px] text-paper transition-colors duration-300 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent"
+                className="inline-flex min-h-[46px] cursor-pointer items-center rounded-full border border-paper/22 px-5 text-[15px] text-paper transition-colors duration-300 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent"
               >
                 Enviar otra solicitud
               </button>
@@ -663,23 +685,27 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
         </div>
       </div>
 
-      {/* Footer navigation */}
+      {/* Footer navigation: thumb-reach bar on phones, split layout from tablet up. */}
       {step !== DONE && (
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-          {step > 0 ? (
+        <div className="mt-auto flex items-center gap-2.5 sm:justify-between">
+          {step > 0 && (
             <button
               type="button"
               onClick={() => goTo(step - 1)}
-              className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] text-mist transition-colors hover:text-paper focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+              aria-label="Atrás"
+              className={[
+                "inline-flex size-[52px] flex-none cursor-pointer items-center justify-center gap-2.5 rounded-full border border-paper/22 text-lg text-mist transition-colors hover:border-paper/55 hover:text-paper",
+                "focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent",
+                "sm:size-auto sm:min-h-11 sm:border-0 sm:px-1 sm:text-[15px]",
+              ].join(" ")}
             >
-              <span aria-hidden="true">←</span> Atrás
+              <span aria-hidden="true">←</span>
+              <span className="hidden sm:inline">Atrás</span>
             </button>
-          ) : (
-            <span />
           )}
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-[18px]">
+          <div className="flex flex-1 items-center justify-end gap-[18px] sm:ml-auto sm:flex-none">
             {(step === 1 || step === 2) && (
-              <span className="font-mono text-xs text-dim max-[640px]:hidden">
+              <span className="font-mono text-xs text-dim max-sm:hidden">
                 <kbd className="rounded-[5px] border border-paper/22 px-1.5 py-0.5 font-mono text-[11px] text-mist">Enter</kbd> para
                 continuar
               </span>
@@ -688,7 +714,7 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
               type="submit"
               aria-disabled={stepInvalid || sending}
               className={[
-                "group inline-flex min-h-[54px] cursor-pointer items-center justify-center gap-3 rounded-full bg-paper px-[26px] text-base font-medium tracking-[-.005em] text-ink",
+                "group inline-flex min-h-[52px] flex-1 cursor-pointer items-center justify-center gap-3 rounded-full bg-paper px-[22px] text-base font-medium tracking-[-.005em] text-ink sm:flex-none sm:px-[26px]",
                 "transition-[background-color,opacity,transform] duration-300 hover:bg-white active:scale-[.98]",
                 "focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent",
                 stepInvalid ? "opacity-40" : "",
@@ -724,19 +750,37 @@ export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: s
    --------------------------------------------------------------------------- */
 
 const lineInput =
-  "min-w-0 flex-1 border-0 bg-transparent pt-2 pb-3 text-[clamp(22px,3vw,32px)] font-medium tracking-[-.02em] text-paper outline-none placeholder:text-[#5E6878]";
+  "min-w-0 flex-1 border-0 bg-transparent pt-1.5 pb-2.5 text-[22px] font-medium tracking-[-.02em] text-paper outline-none placeholder:text-[#5E6878] sm:text-[26px]";
 
-function StepTitle({ title, children, ref }: { title: string; children: React.ReactNode; ref: React.Ref<HTMLHeadingElement> }) {
+/** "Tus datos llegan directo…" note. Shown in step 3 below desktop, and in the text column on desktop. */
+export function PrivacyNote({ className = "" }: { className?: string }) {
   return (
-    <div className="flex flex-col gap-2.5">
+    <p className={`m-0 flex items-start gap-2.5 leading-[1.55] text-dim ${className}`}>
+      <LockIcon />
+      Tus datos llegan directo al equipo de BICOVEX y no se comparten con nadie más.
+    </p>
+  );
+}
+
+function OptionalTag() {
+  return (
+    <span className="rounded-full border border-paper/12 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[.1em] text-dim">
+      Opcional
+    </span>
+  );
+}
+
+function StepTitle({ title, children, ref }: { title: string; children?: React.ReactNode; ref: React.Ref<HTMLHeadingElement> }) {
+  return (
+    <div className="flex flex-col gap-1.5">
       <h3
         ref={ref}
         tabIndex={-1}
-        className="m-0 text-[clamp(28px,3.4vw,44px)] font-semibold leading-[1.05] tracking-[-.035em] outline-none"
+        className="m-0 text-[26px] font-semibold leading-[1.08] tracking-[-.03em] outline-none sm:text-[32px]"
       >
         {title}
       </h3>
-      <p className="m-0 max-w-[56ch] text-base leading-[1.6] text-mist">{children}</p>
+      {children && <p className="m-0 text-[15px] leading-normal text-mist">{children}</p>}
     </div>
   );
 }
@@ -757,22 +801,20 @@ function LineField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       <label htmlFor={id} className="flex items-center justify-between font-mono text-xs uppercase tracking-[.12em] text-mist">
         {label}
-        {optional && (
-          <span className="rounded-full border border-paper/12 px-2 py-0.5 text-[11px] tracking-[.1em] text-dim">Opcional</span>
-        )}
+        {optional && <OptionalTag />}
       </label>
       <div
-        className={`flex items-baseline gap-3 border-b transition-[border-color,box-shadow] duration-300 ${
+        className={`flex items-baseline gap-2.5 border-b transition-[border-color,box-shadow] duration-300 ${
           error
             ? "border-[#F98B8B] shadow-[0_1px_0_0_#F98B8B]"
             : "border-paper/22 focus-within:border-accent focus-within:shadow-[0_1px_0_0_var(--color-accent)]"
         }`}
       >
         {prefix && (
-          <span aria-hidden="true" className="font-mono text-[clamp(16px,2vw,20px)] text-mist">
+          <span aria-hidden="true" className="font-mono text-base text-mist">
             {prefix}
           </span>
         )}
@@ -785,27 +827,37 @@ function LineField({
 
 function FieldErrorText({ id, message }: { id: string; message: string }) {
   return (
-    <p id={id} aria-live="polite" className="m-0 min-h-5 text-sm text-[#F98B8B]">
+    <p id={id} aria-live="polite" className="m-0 min-h-[18px] text-[13px] leading-snug text-[#F98B8B]">
       {message}
     </p>
   );
 }
 
-function SummaryRow({ label, onEdit, children }: { label: string; onEdit: () => void; children: React.ReactNode }) {
+function SummaryCell({
+  label,
+  onEdit,
+  wide,
+  children,
+}: {
+  label: string;
+  onEdit: () => void;
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="grid grid-cols-[140px_minmax(0,1fr)_auto] items-start gap-4 border-b border-paper/12 py-[18px] max-[560px]:grid-cols-[minmax(0,1fr)_auto]">
-      <dt className="pt-1 font-mono text-xs uppercase tracking-[.12em] text-mist max-[560px]:col-span-full max-[560px]:pt-0">
+    <div className={`flex min-w-0 flex-col gap-1 border-b border-paper/12 py-2.5 sm:gap-1.5 sm:py-3 ${wide ? "sm:col-span-2" : ""}`}>
+      <dt className="flex items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-[.12em] text-mist">
         {label}
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Editar ${label.toLowerCase()}`}
+          className="cursor-pointer py-0.5 font-sans text-[13px] tracking-normal normal-case text-mist underline-offset-[3px] transition-colors hover:text-paper hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-accent"
+        >
+          Editar
+        </button>
       </dt>
-      <dd className="m-0 min-w-0 text-[17px] leading-[1.5] break-words text-paper">{children}</dd>
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label={`Editar ${label.toLowerCase()}`}
-        className="cursor-pointer border-b border-transparent py-1 text-sm text-mist transition-colors hover:border-paper/22 hover:text-paper focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-      >
-        Editar
-      </button>
+      <dd className="m-0 text-base leading-[1.45] break-words text-paper">{children}</dd>
     </div>
   );
 }
