@@ -24,7 +24,8 @@ export function Contact() {
           </p>
         </div>
 
-        <ContactStepper />
+        {/* NEXT_SITE_KEY is public by design; it is read here at build time and handed to the form. */}
+        <ContactStepper turnstileSiteKey={process.env.NEXT_SITE_KEY ?? ""} />
       </div>
     </section>
   );

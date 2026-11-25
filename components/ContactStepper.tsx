@@ -14,6 +14,7 @@ import {
 } from "@/lib/contact-form";
 import { PRESELECT_EVENT } from "@/lib/preselect";
 import { MARK_QUADRANTS } from "@/lib/logo-paths";
+import { loadTurnstile } from "@/lib/turnstile";
 
 const STEPS = ["Servicio", "Datos", "Contacto", "Enviar"] as const;
 const DONE = 4;
@@ -33,7 +34,7 @@ const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Four-step contact form: services, name, contact detail, review and send. */
-export function ContactStepper() {
+export function ContactStepper({ turnstileSiteKey = "" }: { turnstileSiteKey?: string }) {
   const [draft, setDraft] = useState<ContactDraft>(emptyDraft);
   /** The step the progress bar and buttons reflect. */
   const [step, setStep] = useState(0);
@@ -47,6 +48,11 @@ export function ContactStepper() {
   const [sendError, setSendError] = useState("");
   const [sent, setSent] = useState<ContactDraft | null>(null);
   const [live, setLive] = useState("");
+  /** Cloudflare Turnstile token for the review step; single use, expires after 5 minutes. */
+  const [humanToken, setHumanToken] = useState("");
+  const [humanCheckFailed, setHumanCheckFailed] = useState(false);
+  const turnstileBoxRef = useRef<HTMLDivElement>(null);
+  const turnstileIdRef = useRef<string | null>(null);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -182,6 +188,47 @@ export function ContactStepper() {
     return () => window.removeEventListener(PRESELECT_EVENT, onPreselect);
   }, [goTo]);
 
+  /* ---------- Cloudflare Turnstile on the review step ---------- */
+  useEffect(() => {
+    if (shown !== 3 || !turnstileSiteKey) return;
+    let cancelled = false;
+    setHumanToken("");
+    setHumanCheckFailed(false);
+    loadTurnstile()
+      .then((ts) => {
+        const box = turnstileBoxRef.current;
+        if (cancelled || !box) return;
+        turnstileIdRef.current = ts.render(box, {
+          sitekey: turnstileSiteKey,
+          action: "contacto",
+          theme: "dark",
+          language: "es",
+          // Stays invisible unless Cloudflare needs the visitor to tick a box.
+          appearance: "interaction-only",
+          callback: (token: string) => {
+            setHumanToken(token);
+            setHumanCheckFailed(false);
+          },
+          "expired-callback": () => setHumanToken(""),
+          "error-callback": () => {
+            setHumanToken("");
+            setHumanCheckFailed(true);
+          },
+        });
+      })
+      .catch(() => !cancelled && setHumanCheckFailed(true));
+    return () => {
+      cancelled = true;
+      if (turnstileIdRef.current) window.turnstile?.remove(turnstileIdRef.current);
+      turnstileIdRef.current = null;
+    };
+  }, [shown, turnstileSiteKey]);
+
+  const resetTurnstile = () => {
+    if (turnstileIdRef.current) window.turnstile?.reset(turnstileIdRef.current);
+    setHumanToken("");
+  };
+
   /* ---------- submit: validate the step, advance, or send ---------- */
   const focusError = (err: FieldError) => {
     const el = err.field === "name" ? nameRef.current : err.field === "email" ? emailRef.current : err.field === "phone" ? phoneRef.current : null;
@@ -203,6 +250,15 @@ export function ContactStepper() {
       return;
     }
 
+    if (turnstileSiteKey && !humanToken) {
+      setSendError(
+        humanCheckFailed
+          ? "No pudimos cargar la verificación de seguridad. Recarga la página e intenta de nuevo."
+          : "Estamos verificando la conexión. Intenta de nuevo en unos segundos.",
+      );
+      return;
+    }
+
     setSending(true);
     setSendError("");
     try {
@@ -213,6 +269,7 @@ export function ContactStepper() {
           ...draft,
           website: honeypotRef.current?.value ?? "",
           elapsedMs: Date.now() - startedAt.current,
+          turnstileToken: humanToken,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -223,6 +280,7 @@ export function ContactStepper() {
       } catch {}
       goTo(DONE);
     } catch (err) {
+      resetTurnstile();
       setSendError(
         err instanceof TypeError
           ? "No hay conexión. Revisa tu internet e intenta de nuevo."
@@ -243,7 +301,8 @@ export function ContactStepper() {
   };
 
   /* ---------- derived UI ---------- */
-  const stepInvalid = step < 3 && stepError(step, draft) !== null;
+  const verifying = step === 3 && Boolean(turnstileSiteKey) && !humanToken && !humanCheckFailed;
+  const stepInvalid = (step < 3 && stepError(step, draft) !== null) || verifying;
   const n = draft.services.length;
   const nextLabel =
     step === 0
@@ -255,7 +314,9 @@ export function ContactStepper() {
       : step === 3
         ? sending
           ? "Enviando…"
-          : "Enviar solicitud"
+          : verifying
+            ? "Verificando…"
+            : "Enviar solicitud"
         : "Continuar";
 
   const isStepDone = (i: number) =>
@@ -549,6 +610,7 @@ export function ContactStepper() {
                   </span>
                 </SummaryRow>
               </dl>
+              {turnstileSiteKey && <div ref={turnstileBoxRef} className="empty:hidden" />}
               <p role="alert" className="m-0 min-h-5 text-sm text-[#F98B8B]">
                 {sendError}
               </p>

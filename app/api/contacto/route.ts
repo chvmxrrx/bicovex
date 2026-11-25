@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { draftError, parseDraft } from "@/lib/contact-form";
 import { buildRequestEmail } from "@/lib/contact-email";
+import { verifyTurnstile } from "@/lib/turnstile-verify";
 
 /**
  * Receives contact requests and forwards them by email through Resend.
@@ -14,6 +15,7 @@ import { buildRequestEmail } from "@/lib/contact-email";
  *  4. Full validation with the same rules as the form.
  *  5. Per-IP rate limit. It lives in memory, so it resets when Vercel starts a new
  *     instance; it slows down floods but is not a hard guarantee.
+ *  6. Cloudflare Turnstile, once SECRET_KEY is set.
  * Bots caught by 1 and 2 get a fake success so they don't learn to adapt.
  */
 
@@ -63,6 +65,14 @@ export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "desconocida";
   if (rateLimited(ip)) {
     return fail(429, "Recibimos varias solicitudes seguidas desde tu conexión. Espera unos minutos e intenta de nuevo.");
+  }
+
+  const human = await verifyTurnstile(body.turnstileToken, ip === "desconocida" ? undefined : ip);
+  if (human === false) {
+    return fail(400, "No pudimos verificar que la solicitud viene de una persona. Recarga la página e intenta de nuevo.");
+  }
+  if (human === null && process.env.NODE_ENV === "production") {
+    console.warn("[contacto] SECRET_KEY no está configurada; se envía sin verificación de Cloudflare.");
   }
 
   const apiKey = process.env.RESEND_API_KEY;
