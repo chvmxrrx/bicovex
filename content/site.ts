@@ -4,9 +4,6 @@ export const site = {
   description:
     "Sitios, tiendas, plataformas, agendas, chatbots y apps móviles diseñados para trabajar conectados entre sí — software a medida que ordena tu operación y crece contigo.",
   tagline: "Connect. Build. Scale.",
-  email: "b.chamorro.bc@gmail.com",
-  phoneDisplay: "+56 9 3682 7702",
-  whatsapp: "56936827702",
   year: 2026,
 } as const;
 

@@ -3,6 +3,7 @@ import { site } from "@/content/site";
 import { heroNodes } from "@/content/services";
 import { MARK_QUADRANTS } from "@/lib/logo-paths";
 import { ButtonLink } from "@/components/Button";
+import { PreselectLink } from "@/components/PreselectLink";
 
 export function Hero() {
   return (
@@ -129,10 +130,12 @@ function ConnectedCore() {
         </svg>
 
         {heroNodes.map((node, i) => (
-          <div
+          <PreselectLink
             key={node.label}
+            service={node.service}
+            aria-label={`Cotizar ${node.label}`}
             className={[
-              "anim-fade absolute top-(--y) left-(--x) flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-paper/14 bg-ink-2 px-3.5 py-2 font-mono text-xs text-fog-2 transition-colors duration-300 hover:border-accent hover:text-white",
+              "anim-fade absolute top-(--y) left-(--x) flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-paper/14 bg-ink-2 px-3.5 py-2 font-mono text-xs text-fog-2 no-underline transition-colors duration-300 hover:border-accent hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               // Phones: smaller pills, side labels pinned to the ring's edge so they stay on screen.
               "max-[760px]:top-(--y-sm) max-[760px]:gap-1.5 max-[760px]:px-2 max-[760px]:py-1.5 max-[760px]:text-[11px]",
               node.side === "left" ? "max-[760px]:left-0 max-[760px]:translate-x-0" : "",
@@ -149,7 +152,7 @@ function ConnectedCore() {
           >
             <i className="block size-1.5 rounded-full bg-accent" />
             <span>{node.label}</span>
-          </div>
+          </PreselectLink>
         ))}
       </div>
     </div>

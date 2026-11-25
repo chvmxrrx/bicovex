@@ -24,3 +24,6 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# allow the documented env template
+!.env.example

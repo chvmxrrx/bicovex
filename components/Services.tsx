@@ -4,6 +4,8 @@ import { useState } from "react";
 import { services } from "@/content/services";
 import { Eyebrow } from "@/components/Eyebrow";
 import { LogoMark } from "@/components/Logo";
+import { ButtonLink } from "@/components/Button";
+import { preselectService } from "@/lib/preselect";
 
 const pad2 = (n: number) => String(n + 1).padStart(2, "0");
 
@@ -97,15 +99,26 @@ export function Services() {
               ))}
             </ul>
 
-            <div className="relative mt-auto flex flex-wrap gap-2">
-              {current.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-paper/18 px-3 py-[7px] font-mono text-xs text-fog"
-                >
-                  {tag}
-                </span>
-              ))}
+            <div className="relative mt-auto flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                {current.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-paper/18 px-3 py-[7px] font-mono text-xs text-fog"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <ButtonLink
+                href="#contacto"
+                variant="light"
+                arrow
+                onClick={() => preselectService(active)}
+                className="min-h-[46px] px-5 text-sm"
+              >
+                Cotizar {current.short}
+              </ButtonLink>
             </div>
           </div>
         </div>

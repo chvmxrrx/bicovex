@@ -55,14 +55,15 @@ export const services: readonly Service[] = [
 /**
  * `side` says which edge a label hugs on phones, where side labels are pinned to the
  * edge of the ring instead of centred on it. `topSm` nudges them clear of the mark there.
+ * `service` is the index in `services` that the label marks in the contact form when clicked.
  */
 export const heroNodes = [
-  { label: "Páginas web", left: "50%", top: "8.9%", side: "center", topSm: "8.9%" },
-  { label: "E-commerce", left: "85.5%", top: "29.5%", side: "right", topSm: "26%" },
-  { label: "Apps web", left: "85.5%", top: "70.5%", side: "right", topSm: "74%" },
-  { label: "Apps móviles", left: "50%", top: "91.1%", side: "center", topSm: "91.1%" },
-  { label: "Chatbots", left: "14.5%", top: "70.5%", side: "left", topSm: "74%" },
-  { label: "Agenda virtual", left: "14.5%", top: "29.5%", side: "left", topSm: "26%" },
+  { label: "Páginas web", service: 0, left: "50%", top: "8.9%", side: "center", topSm: "8.9%" },
+  { label: "E-commerce", service: 1, left: "85.5%", top: "29.5%", side: "right", topSm: "26%" },
+  { label: "Apps web", service: 2, left: "85.5%", top: "70.5%", side: "right", topSm: "74%" },
+  { label: "Apps móviles", service: 5, left: "50%", top: "91.1%", side: "center", topSm: "91.1%" },
+  { label: "Chatbots", service: 4, left: "14.5%", top: "70.5%", side: "left", topSm: "74%" },
+  { label: "Agenda virtual", service: 3, left: "14.5%", top: "29.5%", side: "left", topSm: "26%" },
 ] as const;
 
 /** Items that scroll in the marquee strip. Alternating items render as outlined text. */
