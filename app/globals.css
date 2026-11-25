@@ -1,0 +1,214 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens, taken from the BICOVEX landing design
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-ink: #0b0f14; /* page background */
+  --color-ink-2: #11161d; /* raised surface on dark */
+  --color-paper: #f5f7fa; /* light background, primary text on dark */
+  --color-accent: #3b82f6;
+
+  /* greys on dark */
+  --color-mist: #aeb6c2; /* body copy on dark */
+  --color-dim: #7d8796; /* quiet mono labels */
+  --color-fog: #c2c9d3; /* panel body */
+  --color-fog-2: #c9d0da; /* node labels */
+  --color-fog-3: #d5dae1; /* chip labels */
+  --color-fog-4: #e3e7ec; /* panel list items */
+
+  /* greys on light */
+  --color-slate: #4b5563; /* body copy on light */
+  --color-slate-2: #5b6472; /* service index on light */
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out-firm: cubic-bezier(0.65, 0, 0.2, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Patterns and text effects
+   --------------------------------------------------------------------------- */
+@utility dots {
+  background-image: radial-gradient(rgba(245, 247, 250, 0.085) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+@utility dots-light {
+  background-image: radial-gradient(rgba(11, 15, 20, 0.075) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+/* Outlined display text (alternate marquee items) */
+@utility text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(245, 247, 250, 0.55);
+}
+
+/* ---------------------------------------------------------------------------
+   Keyframes
+   --------------------------------------------------------------------------- */
+@keyframes mod-in {
+  from {
+    transform: translate(var(--dx, 0px), var(--dy, -22px));
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes rise {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes flow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+@keyframes pulse-ring {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion classes
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Hero line reveal: a clipping wrapper and a rising inner span */
+  .line-wrap {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.06em;
+  }
+  .line-rise {
+    display: inline-block;
+    animation: rise 1.1s var(--ease-out-soft) both;
+  }
+
+  .anim-fade {
+    animation: fade-up 1s var(--ease-out-soft) both;
+  }
+  .anim-mod {
+    animation: mod-in 1.2s var(--ease-out-soft) both;
+  }
+  .anim-spin {
+    animation: spin-slow 80s linear infinite;
+    transform-origin: 50% 50%;
+  }
+  .anim-flow {
+    animation: flow 2.6s linear infinite;
+  }
+  .anim-pulse-ring {
+    animation: pulse-ring 2.6s ease-out infinite;
+    transform-origin: center;
+  }
+  .anim-breathe {
+    animation: breathe 6s ease-in-out 1.6s infinite;
+    transform-origin: center;
+  }
+
+  /* Marquee strip */
+  .marquee-track {
+    animation: marquee 42s linear infinite;
+  }
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* Scroll-driven reveal, only where the browser supports view() timelines */
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: fade-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 28%;
+    }
+  }
+
+  /* Process step: outlined word fills on hover, progress bar grows */
+  .step-word {
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(245, 247, 250, 0.45);
+    transition:
+      color 0.6s,
+      -webkit-text-stroke-color 0.6s;
+  }
+  .group:hover .step-word {
+    color: var(--color-paper);
+    -webkit-text-stroke-color: var(--color-paper);
+  }
+  .step-bar {
+    transform: scaleX(0.18);
+    transform-origin: left;
+    transition: transform 0.9s var(--ease-out-soft);
+  }
+  .group:hover .step-bar {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
